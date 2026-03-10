@@ -3,12 +3,39 @@
 import { useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
 
+type Scenario = 'bull' | 'normal' | 'bear';
+
+const SCENARIOS: Record<Scenario, { label: string; icon: string; return: number; color: string; description: string }> = {
+  bull: {
+    label: 'Bull Run',
+    icon: '',
+    return: 14,
+    color: 'text-green-400 bg-green-500/15 border-green-500/30',
+    description: 'Strong markets like 2009-2021. Tech-heavy portfolios averaged 14%+ annually.',
+  },
+  normal: {
+    label: 'Normal Market',
+    icon: '',
+    return: 9,
+    color: 'text-blue-400 bg-blue-500/15 border-blue-500/30',
+    description: 'Historical average. S&P 500 has returned about 10% per year since 1926, or ~9% adjusted.',
+  },
+  bear: {
+    label: 'Bear Market',
+    icon: '',
+    return: 4,
+    color: 'text-red-400 bg-red-500/15 border-red-500/30',
+    description: 'Prolonged downturn like the 2000s. Includes recessions, crashes, and slow recovery periods.',
+  },
+};
+
 export default function RetirementPage() {
   const [age, setAge] = useState(28);
   const [retirementAge, setRetirementAge] = useState(60);
   const [currentSavings, setCurrentSavings] = useState(63050);
   const [monthlyContribution, setMonthlyContribution] = useState(1500);
-  const [expectedReturn, setExpectedReturn] = useState(9);
+  const [scenario, setScenario] = useState<Scenario>('normal');
+  const expectedReturn = SCENARIOS[scenario].return;
 
   // Calculate projections
   const yearsToRetirement = retirementAge - age;
@@ -153,18 +180,36 @@ export default function RetirementPage() {
                 className="w-full bg-[#1e293b] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500"
               />
             </div>
+            {/* Scenario Selector */}
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Expected Annual Return (%)</label>
-              <input
-                type="number"
-                value={expectedReturn}
-                onChange={(e) => setExpectedReturn(Number(e.target.value))}
-                step={0.5}
-                className="w-full bg-[#1e293b] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                S&P 500 historical average: ~10%. Conservative estimate: 7%. Your current portfolio: ~9%.
-              </p>
+              <label className="block text-sm text-gray-400 mb-2">Market Scenario</label>
+              <div className="space-y-2">
+                {(Object.keys(SCENARIOS) as Scenario[]).map((key) => {
+                  const s = SCENARIOS[key];
+                  const isActive = scenario === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setScenario(key)}
+                      className={`w-full text-left border rounded-xl p-3 transition-all ${
+                        isActive ? s.color + ' border' : 'bg-[#1e293b] border-[#334155] hover:border-[#4b5563]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{s.icon}</span>
+                          <span className={`text-sm font-medium ${isActive ? '' : 'text-gray-300'}`}>{s.label}</span>
+                        </div>
+                        <span className={`text-sm font-bold ${isActive ? '' : 'text-gray-400'}`}>{s.return}% / yr</span>
+                      </div>
+                      {isActive && (
+                        <p className="text-xs mt-1.5 opacity-80">{s.description}</p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -206,6 +251,43 @@ export default function RetirementPage() {
               </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Scenario Comparison */}
+      <div className="bg-[#111827] border border-[#1e293b] rounded-xl p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">All Scenarios Compared</h3>
+        <p className="text-sm text-gray-400 mb-4">See how different market environments change your retirement outcome</p>
+        <div className="grid md:grid-cols-3 gap-4">
+          {(Object.keys(SCENARIOS) as Scenario[]).map((key) => {
+            const s = SCENARIOS[key];
+            const mr = s.return / 100 / 12;
+            let val = currentSavings;
+            for (let m = 0; m < totalMonths; m++) {
+              val = val * (1 + mr) + monthlyContribution;
+            }
+            const monthlyIncome = (val * 0.04) / 12;
+            const isActive = scenario === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setScenario(key)}
+                className={`text-left border rounded-xl p-5 transition-all ${
+                  isActive ? s.color + ' border-2' : 'bg-[#1e293b]/50 border-[#334155] hover:border-[#4b5563]'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-2xl">{s.icon}</span>
+                  <span className="text-sm font-semibold text-white">{s.label}</span>
+                  <span className="text-xs text-gray-400 ml-auto">{s.return}%/yr</span>
+                </div>
+                <p className="text-2xl font-bold text-white mb-1">{formatCurrency(val)}</p>
+                <p className="text-xs text-gray-400">
+                  {formatCurrency(monthlyIncome)}/month in retirement (4% rule)
+                </p>
+              </button>
+            );
+          })}
         </div>
       </div>
 

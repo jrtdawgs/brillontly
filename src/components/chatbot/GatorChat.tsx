@@ -1,14 +1,58 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { findResponse, GATOR_CONFIG, type ChatMessage } from '@/lib/chatbot/knowledge';
+import { findResponse, BIGBULL_CONFIG, type ChatMessage } from '@/lib/chatbot/knowledge';
+
+// Horizontal alligator SVG for the bubble button
+function BigBullIcon({ size = 'large' }: { size?: 'large' | 'small' }) {
+  const w = size === 'large' ? 'w-12 h-8' : 'w-8 h-6';
+  return (
+    <svg viewBox="0 0 96 48" className={w} fill="none">
+      {/* Tail */}
+      <path d="M4 28 Q8 20 14 24 Q10 30 14 32" fill="#16a34a" />
+      <path d="M4 28 Q8 34 14 32" fill="#22c55e" />
+      {/* Body */}
+      <ellipse cx="32" cy="28" rx="20" ry="12" fill="#22c55e" />
+      {/* Scales/bumps on back */}
+      <circle cx="22" cy="18" r="2.5" fill="#16a34a" />
+      <circle cx="28" cy="16.5" r="2.5" fill="#16a34a" />
+      <circle cx="34" cy="16" r="2.5" fill="#16a34a" />
+      <circle cx="40" cy="17" r="2" fill="#16a34a" />
+      {/* Belly */}
+      <ellipse cx="32" cy="32" rx="16" ry="6" fill="#4ade80" opacity="0.4" />
+      {/* Legs */}
+      <path d="M20 36 L17 42 L20 41 L22 43 L23 38" fill="#16a34a" />
+      <path d="M40 36 L37 42 L40 41 L42 43 L43 38" fill="#16a34a" />
+      {/* Head - long snout */}
+      <ellipse cx="56" cy="26" rx="12" ry="9" fill="#16a34a" />
+      <ellipse cx="64" cy="24" rx="14" ry="6" fill="#22c55e" />
+      {/* Upper jaw */}
+      <path d="M62 20 Q72 18 80 22 Q76 24 62 24 Z" fill="#16a34a" />
+      {/* Lower jaw */}
+      <path d="M62 26 Q72 28 78 26 Q74 24 62 24 Z" fill="#22c55e" />
+      {/* Teeth */}
+      <path d="M68 22 L69 24.5 L70 22" fill="white" />
+      <path d="M73 21 L74 23.5 L75 21" fill="white" />
+      <path d="M69 26 L70 24 L71 26" fill="white" />
+      {/* Mouth line */}
+      <path d="M56 24 Q68 25 80 24" stroke="#15803d" strokeWidth="1" fill="none" />
+      {/* Eye bumps */}
+      <ellipse cx="54" cy="18" rx="4" ry="4.5" fill="#16a34a" />
+      {/* Eyes */}
+      <circle cx="54" cy="17" r="3" fill="white" />
+      <circle cx="54" cy="17" r="1.5" fill="#0a0f1a" />
+      {/* Nostril */}
+      <circle cx="77" cy="21" r="1" fill="#15803d" />
+    </svg>
+  );
+}
 
 export default function GatorChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      role: 'gator',
-      content: GATOR_CONFIG.greeting,
+      role: 'bigbull',
+      content: BIGBULL_CONFIG.greeting,
       timestamp: new Date(),
     },
   ]);
@@ -36,13 +80,13 @@ export default function GatorChat() {
     };
 
     const response = findResponse(input);
-    const gatorMessage: ChatMessage = {
-      role: 'gator',
+    const bigBullMessage: ChatMessage = {
+      role: 'bigbull',
       content: response,
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage, gatorMessage]);
+    setMessages((prev) => [...prev, userMessage, bigBullMessage]);
     setInput('');
   };
 
@@ -52,31 +96,11 @@ export default function GatorChat() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 flex items-center justify-center hover:scale-110 transition-transform gator-bubble"
-          title="Chat with Gator"
+          className="fixed bottom-6 right-6 z-50 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 flex items-center gap-2 px-4 py-3 hover:scale-105 transition-transform gator-bubble"
+          title="Chat with Big Bull"
         >
-          {/* Alligator SVG icon */}
-          <svg viewBox="0 0 64 64" className="w-10 h-10" fill="none">
-            {/* Body */}
-            <ellipse cx="32" cy="38" rx="18" ry="12" fill="#22c55e" />
-            {/* Head */}
-            <ellipse cx="32" cy="24" rx="14" ry="10" fill="#16a34a" />
-            {/* Snout */}
-            <ellipse cx="32" cy="20" rx="10" ry="6" fill="#22c55e" />
-            {/* Eyes */}
-            <circle cx="26" cy="18" r="3" fill="white" />
-            <circle cx="38" cy="18" r="3" fill="white" />
-            <circle cx="26" cy="18" r="1.5" fill="#0a0f1a" />
-            <circle cx="38" cy="18" r="1.5" fill="#0a0f1a" />
-            {/* Nostrils */}
-            <circle cx="29" cy="16" r="1" fill="#15803d" />
-            <circle cx="35" cy="16" r="1" fill="#15803d" />
-            {/* Mouth line */}
-            <path d="M22 22 Q32 26 42 22" stroke="#15803d" strokeWidth="1.5" fill="none" />
-            {/* Teeth */}
-            <path d="M25 22 L26 24 L27 22" fill="white" />
-            <path d="M37 22 L38 24 L39 22" fill="white" />
-          </svg>
+          <BigBullIcon size="large" />
+          <span className="text-white text-xs font-bold">Big Bull</span>
         </button>
       )}
 
@@ -86,19 +110,11 @@ export default function GatorChat() {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-[#1e293b]">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-                <svg viewBox="0 0 64 64" className="w-7 h-7" fill="none">
-                  <ellipse cx="32" cy="24" rx="14" ry="10" fill="#16a34a" />
-                  <ellipse cx="32" cy="20" rx="10" ry="6" fill="#22c55e" />
-                  <circle cx="26" cy="18" r="3" fill="white" />
-                  <circle cx="38" cy="18" r="3" fill="white" />
-                  <circle cx="26" cy="18" r="1.5" fill="#0a0f1a" />
-                  <circle cx="38" cy="18" r="1.5" fill="#0a0f1a" />
-                  <path d="M22 22 Q32 26 42 22" stroke="#15803d" strokeWidth="1.5" fill="none" />
-                </svg>
+              <div className="w-12 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                <BigBullIcon size="small" />
               </div>
               <div>
-                <h3 className="text-white font-semibold text-sm">Gator</h3>
+                <h3 className="text-white font-semibold text-sm">Big Bull</h3>
                 <p className="text-green-400 text-xs">Your Investment Buddy</p>
               </div>
             </div>
@@ -142,7 +158,7 @@ export default function GatorChat() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Ask Gator anything about investing..."
+                placeholder="Ask Big Bull anything about investing..."
                 className="flex-1 bg-[#1e293b] border border-[#334155] rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors"
               />
               <button

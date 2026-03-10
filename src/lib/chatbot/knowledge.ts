@@ -1,9 +1,9 @@
-// Gator - The Brillontly Investment Advisor Chatbot
+// Big Bull - The Brillontly Investment Advisor Chatbot
 // Knowledge-based system, not connected to any AI API
 // Speaks in clear, friendly English - never code-like text
 
 export interface ChatMessage {
-  role: 'user' | 'gator';
+  role: 'user' | 'bigbull';
   content: string;
   timestamp: Date;
 }
@@ -204,7 +204,7 @@ export const KNOWLEDGE_BASE: KnowledgeEntry[] = [
   // --- GENERAL ---
   {
     keywords: ['hello', 'hi', 'hey', 'sup', 'what up'],
-    response: 'Hey there! I am Gator, your Brillontly investment buddy. I can help you understand your portfolio, explain what all these financial numbers mean, or chat about investment strategy. What would you like to know?',
+    response: 'Hey there! I am Big Bull, your Brillontly investment buddy. I can help you understand your portfolio, explain what all these financial numbers mean, or chat about investment strategy. What would you like to know?',
     category: 'greeting',
   },
   {
@@ -249,10 +249,10 @@ export function findResponse(input: string): string {
   return 'That is a great question, but I am not sure I have the best answer for that one. Try asking me about specific holdings in your portfolio (like FXAIX, SOXL, or Bitcoin), investment metrics (like Sharpe ratio, RSI, or VIX), or general strategy (like when to buy, rebalancing, or leverage risks). I am always learning and getting smarter!';
 }
 
-// Gator personality traits for the UI
-export const GATOR_CONFIG = {
-  name: 'Gator',
-  greeting: 'Hey! I am Gator, your investment buddy. Ask me anything about your portfolio, market signals, or investing in general. I keep it simple and straight to the point.',
-  avatar: '/gator-avatar.svg',
+// Big Bull personality traits for the UI
+export const BIGBULL_CONFIG = {
+  name: 'Big Bull',
+  greeting: 'Hey there! I am Big Bull, your investment buddy. Ask me anything about your portfolio, market signals, or investing in general. I keep it simple and straight to the point.',
+  avatar: '/bigbull-avatar.svg',
   personality: 'friendly, clear, no jargon, encouraging but honest about risks',
 };

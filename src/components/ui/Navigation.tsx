@@ -76,19 +76,28 @@ export default function Navigation() {
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link
-              href="/dashboard"
+              href="/accounts"
               className={cn(
                 'text-sm font-medium transition-colors',
-                pathname === '/dashboard' ? 'text-white' : 'text-gray-400 hover:text-white'
+                pathname === '/accounts' ? 'text-white' : 'text-gray-400 hover:text-white'
               )}
             >
-              Portfolio
+              Accounts
             </Link>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-cyan-400 flex items-center justify-center text-xs font-bold text-black">
-              JT
-            </div>
+            <Link
+              href="/login"
+              className="text-sm font-medium text-gray-400 hover:text-white transition-colors"
+            >
+              Log In
+            </Link>
+            <Link
+              href="/signup"
+              className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+            >
+              Sign Up
+            </Link>
           </div>
         </div>
       </div>
