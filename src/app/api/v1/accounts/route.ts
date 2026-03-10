@@ -27,7 +27,7 @@ export async function GET() {
   }
 
   try {
-    const accounts = getAccounts(userId);
+    const accounts = await getAccounts(userId);
     return NextResponse.json({
       success: true,
       data: accounts.map((a) => ({
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const account = createAccount(userId, accountType, { name, holdings });
+    const account = await createAccount(userId, accountType, { name, holdings });
 
     return NextResponse.json({
       success: true,
@@ -113,7 +113,7 @@ export async function DELETE() {
   }
 
   try {
-    const deleted = deleteAllAccounts(userId);
+    const deleted = await deleteAllAccounts(userId);
     return NextResponse.json({
       success: true,
       message: `Deleted ${deleted} account(s). All encrypted data has been permanently removed.`,

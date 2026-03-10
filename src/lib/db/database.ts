@@ -1,8 +1,8 @@
-// SQLite database with encrypted account storage
+// Turso/libSQL database with encrypted account storage
+// Works on Vercel serverless (no native modules)
 // Sensitive data is encrypted with AES-256-GCM before writing
 
-import Database from 'better-sqlite3';
-import path from 'path';
+import { createClient, type Client } from '@libsql/client';
 import { encryptObject, decryptObject } from '@/lib/crypto/encryption';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -29,36 +29,34 @@ export interface DecryptedAccount {
   updatedAt: string;
 }
 
-interface AccountRow {
-  id: string;
-  user_id: string;
-  encrypted_data: string;
-  account_type: string;
-  created_at: string;
-  updated_at: string;
-}
+let client: Client | null = null;
 
-let db: Database.Database | null = null;
+function getClient(): Client {
+  if (client) return client;
 
-function getDb(): Database.Database {
-  if (db) return db;
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
 
-  const dbPath = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'brilliontly.db');
-
-  // Ensure directory exists
-  const dir = path.dirname(dbPath);
-  const fs = require('fs');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!url) {
+    throw new Error(
+      'TURSO_DATABASE_URL is not set. Sign up free at https://turso.tech and create a database.'
+    );
   }
 
-  db = new Database(dbPath);
+  client = createClient({
+    url,
+    authToken,
+  });
 
-  // Enable WAL mode for better concurrent read performance
-  db.pragma('journal_mode = WAL');
+  return client;
+}
 
-  // Create tables
-  db.exec(`
+// Initialize tables (call once on first request)
+let initialized = false;
+async function ensureTables() {
+  if (initialized) return;
+  const db = getClient();
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS encrypted_accounts (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -66,107 +64,122 @@ function getDb(): Database.Database {
       account_type TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_accounts_user_id
-    ON encrypted_accounts(user_id);
+    )
   `);
-
-  return db;
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_accounts_user_id
+    ON encrypted_accounts(user_id)
+  `);
+  initialized = true;
 }
 
 // Create a new encrypted account
-export function createAccount(
+export async function createAccount(
   userId: string,
   accountType: string,
   data: AccountData
-): DecryptedAccount {
-  const database = getDb();
+): Promise<DecryptedAccount> {
+  await ensureTables();
+  const db = getClient();
   const id = uuidv4();
   const encrypted = encryptObject(data);
   const now = new Date().toISOString();
 
-  database.prepare(`
-    INSERT INTO encrypted_accounts (id, user_id, encrypted_data, account_type, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, userId, encrypted, accountType, now, now);
+  await db.execute({
+    sql: 'INSERT INTO encrypted_accounts (id, user_id, encrypted_data, account_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    args: [id, userId, encrypted, accountType, now, now],
+  });
 
   return { id, userId, accountType, data, createdAt: now, updatedAt: now };
 }
 
 // Get all accounts for a user (decrypted)
-export function getAccounts(userId: string): DecryptedAccount[] {
-  const database = getDb();
-  const rows = database.prepare(
-    'SELECT * FROM encrypted_accounts WHERE user_id = ? ORDER BY created_at'
-  ).all(userId) as AccountRow[];
+export async function getAccounts(userId: string): Promise<DecryptedAccount[]> {
+  await ensureTables();
+  const db = getClient();
 
-  return rows.map((row) => ({
-    id: row.id,
-    userId: row.user_id,
-    accountType: row.account_type,
-    data: decryptObject<AccountData>(row.encrypted_data),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+  const result = await db.execute({
+    sql: 'SELECT * FROM encrypted_accounts WHERE user_id = ? ORDER BY created_at',
+    args: [userId],
+  });
+
+  return result.rows.map((row) => ({
+    id: row.id as string,
+    userId: row.user_id as string,
+    accountType: row.account_type as string,
+    data: decryptObject<AccountData>(row.encrypted_data as string),
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
   }));
 }
 
 // Get a single account by ID (decrypted)
-export function getAccount(id: string, userId: string): DecryptedAccount | null {
-  const database = getDb();
-  const row = database.prepare(
-    'SELECT * FROM encrypted_accounts WHERE id = ? AND user_id = ?'
-  ).get(id, userId) as AccountRow | undefined;
+export async function getAccount(id: string, userId: string): Promise<DecryptedAccount | null> {
+  await ensureTables();
+  const db = getClient();
 
-  if (!row) return null;
+  const result = await db.execute({
+    sql: 'SELECT * FROM encrypted_accounts WHERE id = ? AND user_id = ?',
+    args: [id, userId],
+  });
+
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
 
   return {
-    id: row.id,
-    userId: row.user_id,
-    accountType: row.account_type,
-    data: decryptObject<AccountData>(row.encrypted_data),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    id: row.id as string,
+    userId: row.user_id as string,
+    accountType: row.account_type as string,
+    data: decryptObject<AccountData>(row.encrypted_data as string),
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
   };
 }
 
 // Update an encrypted account
-export function updateAccount(
+export async function updateAccount(
   id: string,
   userId: string,
   data: AccountData
-): DecryptedAccount | null {
-  const database = getDb();
+): Promise<DecryptedAccount | null> {
+  await ensureTables();
+  const db = getClient();
   const encrypted = encryptObject(data);
   const now = new Date().toISOString();
 
-  const result = database.prepare(`
-    UPDATE encrypted_accounts
-    SET encrypted_data = ?, updated_at = ?
-    WHERE id = ? AND user_id = ?
-  `).run(encrypted, now, id, userId);
+  const result = await db.execute({
+    sql: 'UPDATE encrypted_accounts SET encrypted_data = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+    args: [encrypted, now, id, userId],
+  });
 
-  if (result.changes === 0) return null;
-
+  if (result.rowsAffected === 0) return null;
   return getAccount(id, userId);
 }
 
 // Delete a single account
-export function deleteAccount(id: string, userId: string): boolean {
-  const database = getDb();
-  const result = database.prepare(
-    'DELETE FROM encrypted_accounts WHERE id = ? AND user_id = ?'
-  ).run(id, userId);
-  return result.changes > 0;
+export async function deleteAccount(id: string, userId: string): Promise<boolean> {
+  await ensureTables();
+  const db = getClient();
+
+  const result = await db.execute({
+    sql: 'DELETE FROM encrypted_accounts WHERE id = ? AND user_id = ?',
+    args: [id, userId],
+  });
+
+  return (result.rowsAffected ?? 0) > 0;
 }
 
 // Delete ALL accounts for a user (nuclear option)
-export function deleteAllAccounts(userId: string): number {
-  const database = getDb();
-  const result = database.prepare(
-    'DELETE FROM encrypted_accounts WHERE user_id = ?'
-  ).run(userId);
-  return result.changes;
+export async function deleteAllAccounts(userId: string): Promise<number> {
+  await ensureTables();
+  const db = getClient();
+
+  const result = await db.execute({
+    sql: 'DELETE FROM encrypted_accounts WHERE user_id = ?',
+    args: [userId],
+  });
+
+  return result.rowsAffected ?? 0;
 }
 
 // Check if encryption is properly configured

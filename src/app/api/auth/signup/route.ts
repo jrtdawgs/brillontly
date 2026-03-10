@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = createUser(email, name, password);
+    const user = await createUser(email, name, password);
     if (!user) {
       return NextResponse.json(
         { success: false, error: 'An account with this email already exists.' },

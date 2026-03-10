@@ -1,8 +1,7 @@
-// User authentication database
+// User authentication database (Turso/libSQL - works on Vercel serverless)
 // Passwords are hashed with bcrypt, never stored in plain text
 
-import Database from 'better-sqlite3';
-import path from 'path';
+import { createClient, type Client } from '@libsql/client';
 import { hashSync, compareSync } from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,92 +12,109 @@ export interface User {
   createdAt: string;
 }
 
-interface UserRow {
-  id: string;
-  email: string;
-  name: string;
-  password_hash: string;
-  created_at: string;
-}
+let client: Client | null = null;
 
-let db: Database.Database | null = null;
+function getClient(): Client {
+  if (client) return client;
 
-function getDb(): Database.Database {
-  if (db) return db;
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
 
-  const dbPath = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'brilliontly.db');
-  const dir = path.dirname(dbPath);
-  const fs = require('fs');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!url) {
+    throw new Error(
+      'TURSO_DATABASE_URL is not set. Sign up free at https://turso.tech and create a database.'
+    );
   }
 
-  db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
+  client = createClient({
+    url,
+    authToken,
+  });
 
-  db.exec(`
+  return client;
+}
+
+// Initialize tables (call once on first request)
+let initialized = false;
+async function ensureTables() {
+  if (initialized) return;
+  const db = getClient();
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
       name TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+    )
   `);
-
-  return db;
+  initialized = true;
 }
 
 // Create a new user (signup)
-export function createUser(email: string, name: string, password: string): User | null {
-  const database = getDb();
+export async function createUser(email: string, name: string, password: string): Promise<User | null> {
+  await ensureTables();
+  const db = getClient();
 
   // Check if email already exists
-  const existing = database.prepare('SELECT id FROM users WHERE email = ?').get(email);
-  if (existing) return null;
+  const existing = await db.execute({
+    sql: 'SELECT id FROM users WHERE email = ?',
+    args: [email.toLowerCase().trim()],
+  });
+  if (existing.rows.length > 0) return null;
 
   const id = uuidv4();
   const passwordHash = hashSync(password, 12);
   const now = new Date().toISOString();
 
-  database.prepare(
-    'INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, email.toLowerCase().trim(), name.trim(), passwordHash, now);
+  await db.execute({
+    sql: 'INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+    args: [id, email.toLowerCase().trim(), name.trim(), passwordHash, now],
+  });
 
   return { id, email: email.toLowerCase().trim(), name: name.trim(), createdAt: now };
 }
 
 // Verify credentials and return user (login)
-export function verifyUser(email: string, password: string): User | null {
-  const database = getDb();
-  const row = database.prepare(
-    'SELECT * FROM users WHERE email = ?'
-  ).get(email.toLowerCase().trim()) as UserRow | undefined;
+export async function verifyUser(email: string, password: string): Promise<User | null> {
+  await ensureTables();
+  const db = getClient();
 
-  if (!row) return null;
-  if (!compareSync(password, row.password_hash)) return null;
+  const result = await db.execute({
+    sql: 'SELECT * FROM users WHERE email = ?',
+    args: [email.toLowerCase().trim()],
+  });
+
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+
+  if (!compareSync(password, row.password_hash as string)) return null;
 
   return {
-    id: row.id,
-    email: row.email,
-    name: row.name,
-    createdAt: row.created_at,
+    id: row.id as string,
+    email: row.email as string,
+    name: row.name as string,
+    createdAt: row.created_at as string,
   };
 }
 
 // Get user by ID
-export function getUserById(id: string): User | null {
-  const database = getDb();
-  const row = database.prepare(
-    'SELECT * FROM users WHERE id = ?'
-  ).get(id) as UserRow | undefined;
+export async function getUserById(id: string): Promise<User | null> {
+  await ensureTables();
+  const db = getClient();
 
-  if (!row) return null;
+  const result = await db.execute({
+    sql: 'SELECT * FROM users WHERE id = ?',
+    args: [id],
+  });
+
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
 
   return {
-    id: row.id,
-    email: row.email,
-    name: row.name,
-    createdAt: row.created_at,
+    id: row.id as string,
+    email: row.email as string,
+    name: row.name as string,
+    createdAt: row.created_at as string,
   };
 }
