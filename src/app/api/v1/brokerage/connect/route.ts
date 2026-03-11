@@ -5,8 +5,16 @@ import {
   registerUser,
   deleteUser,
   getConnectionLink,
+  getAccounts,
+  getHoldings,
   isSnapTradeConfigured,
 } from '@/lib/brokerage/snaptrade';
+import {
+  saveSnapTradeSecret,
+  getSnapTradeSecret,
+  deleteSnapTradeConnection,
+  hasSnapTradeConnection,
+} from '@/lib/db/database';
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'brilliontly-dev-secret-change-in-production'
@@ -24,90 +32,103 @@ async function getUser() {
   }
 }
 
-// POST /api/v1/brokerage/connect - Register user with SnapTrade and get connection URL
+// POST /api/v1/brokerage/connect - Register user + get SnapTrade OAuth URL
 export async function POST() {
   const user = await getUser();
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
-  }
-
-  if (!isSnapTradeConfigured()) {
-    return NextResponse.json({
-      success: false,
-      error: 'SnapTrade is not configured. Add SNAPTRADE_CLIENT_ID and SNAPTRADE_CONSUMER_KEY to your environment variables.',
-      setup: {
-        step1: 'Go to https://dashboard.snaptrade.com and create a free account',
-        step2: 'Copy your Client ID and Consumer Key',
-        step3: 'Add them as environment variables (Vercel or .env.local)',
-      },
-    }, { status: 503 });
-  }
+  if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
+  if (!isSnapTradeConfigured()) return NextResponse.json({ success: false, error: 'SnapTrade not configured' }, { status: 503 });
 
   try {
-    // Register user with SnapTrade
     let userSecret: string;
-    try {
-      const registration = await registerUser(user.userId);
-      userSecret = registration.userSecret!;
-    } catch (err: unknown) {
-      // User already exists — delete and re-register to get a fresh secret
-      const error = err as { status?: number; body?: { detail?: string }; message?: string };
-      if (error?.status === 400 || error?.body?.detail?.includes('already') || error?.message?.includes('already')) {
-        try {
-          await deleteUser(user.userId);
-        } catch {
-          // Delete might fail if user doesn't exist on their end, that's fine
-        }
-        const registration = await registerUser(user.userId);
-        userSecret = registration.userSecret!;
-      } else {
-        throw err;
+    const existing = await getSnapTradeSecret(user.userId);
+    if (existing) {
+      userSecret = existing;
+    } else {
+      try {
+        const reg = await registerUser(user.userId);
+        userSecret = reg.userSecret!;
+      } catch (err: unknown) {
+        const e = err as { status?: number; body?: { detail?: string }; message?: string };
+        if (e?.status === 400 || e?.body?.detail?.includes('already') || e?.message?.includes('already')) {
+          try { await deleteUser(user.userId); } catch { /* ignore */ }
+          const reg = await registerUser(user.userId);
+          userSecret = reg.userSecret!;
+        } else throw err;
       }
+      await saveSnapTradeSecret(user.userId, userSecret);
     }
 
-    // Generate the connection portal URL
-    const loginData = await getConnectionLink(user.userId, userSecret) as Record<string, unknown>;
-
-    // The SDK returns either redirectURI or loginRedirectURI depending on version
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'https://brilliontly.vercel.app'}/accounts?connected=true`;
+    const loginData = await getConnectionLink(user.userId, userSecret, redirectUri) as Record<string, unknown>;
     const redirectUrl = loginData.redirectURI || loginData.loginRedirectURI || loginData.redirect_uri;
 
-    if (!redirectUrl) {
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to get redirect URL from SnapTrade',
-      }, { status: 500 });
-    }
+    if (!redirectUrl) return NextResponse.json({ success: false, error: 'No redirect URL from SnapTrade' }, { status: 500 });
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        redirectUrl,
-        userSecret, // Client stores this for future API calls
-      },
-    });
+    return NextResponse.json({ success: true, data: { redirectUrl } });
   } catch (error: unknown) {
-    console.error('SnapTrade connect error:', error);
-    const err = error as { message?: string; status?: number; body?: unknown };
-    const errMsg = err?.message || 'Failed to create brokerage connection';
-    const detail = err?.body ? JSON.stringify(err.body) : undefined;
-    return NextResponse.json(
-      { success: false, error: errMsg, detail },
-      { status: 500 }
-    );
+    const err = error as { message?: string; body?: unknown };
+    console.error('SnapTrade connect error:', err);
+    return NextResponse.json({ success: false, error: err?.message || 'Failed to connect' }, { status: 500 });
   }
 }
 
-// GET /api/v1/brokerage/connect - Check if SnapTrade is configured
+// GET /api/v1/brokerage/connect - Status + live holdings
 export async function GET() {
-  return NextResponse.json({
-    success: true,
-    configured: isSnapTradeConfigured(),
-    provider: 'SnapTrade',
-    supportedBrokerages: [
-      'Fidelity', 'Robinhood', 'Charles Schwab', 'Vanguard', 'TD Ameritrade',
-      'E*TRADE', 'Interactive Brokers', 'Webull', 'Ally Invest', 'Merrill Edge',
-      'JP Morgan', 'Wealthfront', 'Betterment', 'and 100+ more',
-    ],
-    freeTier: '5 connections, read-only, daily refresh',
-  });
+  const user = await getUser();
+  if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
+  if (!isSnapTradeConfigured()) return NextResponse.json({ success: true, connected: false, configured: false });
+
+  const connected = await hasSnapTradeConnection(user.userId);
+  if (!connected) return NextResponse.json({ success: true, connected: false });
+
+  try {
+    const userSecret = await getSnapTradeSecret(user.userId);
+    if (!userSecret) return NextResponse.json({ success: true, connected: false });
+
+    const [accounts, holdings] = await Promise.all([
+      getAccounts(user.userId, userSecret),
+      getHoldings(user.userId, userSecret),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      connected: true,
+      data: {
+        accounts: (accounts as Record<string, unknown>[]).map((a) => ({
+          id: a.id,
+          name: a.name,
+          number: a.number,
+          institutionName: a.institution_name,
+          type: (a.meta as Record<string, unknown>)?.type || 'unknown',
+        })),
+        holdings: (holdings as Record<string, unknown>[]).map((h) => {
+          const account = h.account as Record<string, unknown> | undefined;
+          const symbol = h.symbol as Record<string, unknown> | undefined;
+          const symbolObj = symbol?.symbol as Record<string, unknown> | undefined;
+          return {
+            accountId: account?.id,
+            accountName: account?.name,
+            ticker: (symbolObj?.symbol as string) || 'UNKNOWN',
+            name: (symbolObj?.description as string) || 'Unknown',
+            units: h.units,
+            price: h.price,
+            averageCost: h.average_purchase_price,
+            openPnl: h.open_pnl,
+          };
+        }),
+      },
+    });
+  } catch (error: unknown) {
+    console.error('SnapTrade holdings error:', error);
+    return NextResponse.json({ success: true, connected: true, error: 'Failed to fetch holdings' });
+  }
+}
+
+// DELETE /api/v1/brokerage/connect - Disconnect
+export async function DELETE() {
+  const user = await getUser();
+  if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
+  try { await deleteUser(user.userId); } catch { /* ignore */ }
+  await deleteSnapTradeConnection(user.userId);
+  return NextResponse.json({ success: true, message: 'Brokerage disconnected' });
 }

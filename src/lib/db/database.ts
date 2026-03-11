@@ -70,6 +70,14 @@ async function ensureTables() {
     CREATE INDEX IF NOT EXISTS idx_accounts_user_id
     ON encrypted_accounts(user_id)
   `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS snaptrade_connections (
+      user_id TEXT PRIMARY KEY,
+      encrypted_secret TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
   initialized = true;
 }
 
@@ -180,6 +188,51 @@ export async function deleteAllAccounts(userId: string): Promise<number> {
   });
 
   return result.rowsAffected ?? 0;
+}
+
+// SnapTrade connection storage (secret stored encrypted)
+export async function saveSnapTradeSecret(userId: string, userSecret: string): Promise<void> {
+  await ensureTables();
+  const db = getClient();
+  const encrypted = encryptObject({ userSecret });
+  const now = new Date().toISOString();
+  await db.execute({
+    sql: `INSERT INTO snaptrade_connections (user_id, encrypted_secret, created_at, updated_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET encrypted_secret = ?, updated_at = ?`,
+    args: [userId, encrypted, now, now, encrypted, now],
+  });
+}
+
+export async function getSnapTradeSecret(userId: string): Promise<string | null> {
+  await ensureTables();
+  const db = getClient();
+  const result = await db.execute({
+    sql: 'SELECT encrypted_secret FROM snaptrade_connections WHERE user_id = ?',
+    args: [userId],
+  });
+  if (result.rows.length === 0) return null;
+  const decrypted = decryptObject<{ userSecret: string }>(result.rows[0].encrypted_secret as string);
+  return decrypted.userSecret;
+}
+
+export async function deleteSnapTradeConnection(userId: string): Promise<void> {
+  await ensureTables();
+  const db = getClient();
+  await db.execute({
+    sql: 'DELETE FROM snaptrade_connections WHERE user_id = ?',
+    args: [userId],
+  });
+}
+
+export async function hasSnapTradeConnection(userId: string): Promise<boolean> {
+  await ensureTables();
+  const db = getClient();
+  const result = await db.execute({
+    sql: 'SELECT 1 FROM snaptrade_connections WHERE user_id = ?',
+    args: [userId],
+  });
+  return result.rows.length > 0;
 }
 
 // Check if encryption is properly configured

@@ -47,11 +47,12 @@ export async function deleteUser(userId: string) {
 }
 
 // Generate a connection portal URL for the user to link their brokerage
-export async function getConnectionLink(userId: string, userSecret: string) {
+export async function getConnectionLink(userId: string, userSecret: string, redirectUri?: string) {
   const snaptrade = getSnapTradeClient();
   const response = await snaptrade.authentication.loginSnapTradeUser({
     userId,
     userSecret,
+    ...(redirectUri ? { customRedirect: redirectUri } : {}),
   });
   return response.data;
 }
