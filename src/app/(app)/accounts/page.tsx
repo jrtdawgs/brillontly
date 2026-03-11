@@ -408,10 +408,10 @@ function AccountsContent() {
                       </div>
                       <div className="flex items-center gap-4 text-gray-400">
                         <span>{h.units} shares</span>
-                        {h.price > 0 && <span className="text-white">${h.price.toFixed(2)}</span>}
+                        {Number(h.price) > 0 && <span className="text-white">${Number(h.price).toFixed(2)}</span>}
                         {h.openPnl !== null && h.openPnl !== undefined && (
-                          <span className={h.openPnl >= 0 ? 'text-green-400' : 'text-red-400'}>
-                            {h.openPnl >= 0 ? '+' : ''}{h.openPnl.toFixed(2)}
+                          <span className={Number(h.openPnl) >= 0 ? 'text-green-400' : 'text-red-400'}>
+                            {Number(h.openPnl) >= 0 ? '+' : ''}{Number(h.openPnl).toFixed(2)}
                           </span>
                         )}
                       </div>
