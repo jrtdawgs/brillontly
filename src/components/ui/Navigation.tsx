@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { BrilliontlyLogo } from '@/components/ui/BrilliontlyLogo';
 
 const modes = [
   { name: 'Investing', href: '/investing', icon: 'chart' },
@@ -70,15 +70,8 @@ export default function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <Image
-              src="/brilliontly-logo.svg"
-              alt="Brilliontly"
-              width={36}
-              height={36}
-              className="select-none"
-              draggable={false}
-            />
+          <Link href="/" className="flex items-center gap-1">
+            <BrilliontlyLogo size={32} />
             <span className="text-2xl font-bold bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent">
               Brilliontly
             </span>

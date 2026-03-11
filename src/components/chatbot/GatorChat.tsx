@@ -8,7 +8,7 @@ function BigBullIcon({ size = 'large' }: { size?: 'large' | 'small' }) {
   const px = size === 'large' ? 40 : 28;
   return (
     <Image
-      src="/bigbull-icon.svg"
+      src="/gator.png"
       alt="Big Bull the Gator"
       width={px}
       height={px}
