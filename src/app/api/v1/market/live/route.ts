@@ -9,6 +9,8 @@ export const revalidate = 0;
 // Macro tickers for VIX, Dollar, Yields, Bonds
 const MACRO_TICKERS = ['^VIX', 'DX-Y.NYB', '^TNX', '^FVX', '^TYX', '^IRX', 'TLT', 'UUP', 'GLD'];
 
+const NO_CACHE = { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' };
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type') || 'all'; // all, signals, macro, quotes
@@ -22,11 +24,10 @@ export async function GET(request: Request) {
       const tickersParam = searchParams.get('tickers');
       const tickers = tickersParam ? tickersParam.split(',') : TRACKED_ASSETS.map(a => a.ticker);
       const quotes = await getMultipleQuotes(tickers);
-      return NextResponse.json({
-        success: true,
-        data: Object.fromEntries(quotes),
-        lastUpdated: new Date().toISOString(),
-      });
+      return NextResponse.json(
+        { success: true, data: Object.fromEntries(quotes), lastUpdated: new Date().toISOString() },
+        { headers: NO_CACHE }
+      );
     }
 
     // type === 'all' or 'signals' - get quotes + compute signals
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
     console.error('Live market data error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch live market data' },
-      { status: 500 }
+      { status: 500, headers: NO_CACHE }
     );
   }
 }
@@ -56,6 +57,7 @@ async function getMacroData() {
     success: true,
     data: {
       vix: vixQuote ? { price: vixQuote.price, change: vixQuote.change, changePercent: vixQuote.changePercent } : null,
+
       dollarIndex: dollarQuote ? { price: dollarQuote.price, change: dollarQuote.change, changePercent: dollarQuote.changePercent } : null,
       tenYearYield: tenYearQuote ? { price: tenYearQuote.price, change: tenYearQuote.change } : null,
       fiveYearYield: fiveYearQuote ? { price: fiveYearQuote.price, change: fiveYearQuote.change } : null,
@@ -65,7 +67,7 @@ async function getMacroData() {
       gold: goldQuote ? { price: goldQuote.price, change: goldQuote.change, changePercent: goldQuote.changePercent } : null,
     },
     lastUpdated: new Date().toISOString(),
-  });
+  }, { headers: NO_CACHE });
 }
 
 async function getSignalData() {
@@ -138,5 +140,5 @@ async function getSignalData() {
     data: signalResults,
     tickerCount: Object.keys(signalResults).length,
     lastUpdated: new Date().toISOString(),
-  });
+  }, { headers: NO_CACHE });
 }

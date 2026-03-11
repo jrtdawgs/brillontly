@@ -15,10 +15,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Brilliontly - Institutional-Grade Investment Analytics',
   description: 'Brilliantly make millions with Brilliontly. Institutional-grade portfolio analytics, buy signals, and market intelligence. RSI, capitulation signals, VIX tracking, and more.',
-  icons: {
-    icon: '/brilliontly-icon.svg',
-    apple: '/brilliontly-icon.svg',
-  },
 };
 
 export default function RootLayout({
