@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Brilliontly - Institutional-Grade Investment Analytics',
-  description: 'Brilliantly make millions with Brilliontly. Institutional-grade portfolio analytics, buy signals, and market intelligence. RSI, capitulation signals, VIX tracking, and more.',
+  description: 'Get access to Big Bull, a financial advisor chatbot with secure access to your financial data. Free tier includes CSV import. Paid tier includes brokerage connect. Institutional-grade portfolio analytics, RSI signals, VIX tracking, and more.',
 };
 
 export default function RootLayout({
